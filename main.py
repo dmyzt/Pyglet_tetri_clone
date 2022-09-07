@@ -1,7 +1,8 @@
 from random import choice
 from copy import deepcopy
+from time import sleep
+from sys import exit
 
-import pyglet.clock
 from pyglet.app import run
 from pyglet.window import Window, key
 from pyglet.media import Player, load
@@ -10,7 +11,6 @@ from pyglet.shapes import BorderedRectangle
 from pyglet.clock import schedule_interval, schedule, schedule_once, unschedule
 from pyglet.gl import glClearColor, glOrtho, glViewport
 
-from sys import exit
 from grid import Grid
 from piezas import Piezas
 
@@ -21,7 +21,7 @@ class Tetris2nd(Window):
     theme = load("Techno - Tetris (Remix) (128 kbps).mp3")
     mediaplayer = Player()
     mediaplayer.queue(theme)
-    mediaplayer.volume = 0.05
+    mediaplayer.volume = 0.1
     mediaplayer.loop = True
     mediaplayer.play()
 
@@ -145,7 +145,9 @@ class Tetris2nd(Window):
     def game_over(self):
         """Function to check if the blocks can no longer move and end the game"""
         if self.active_tetrimino[0][1] >= 20 and self.future_position(self.active_tetrimino) is False:
-            print("This is truly game over")
+            print("Game Over!!!")
+            sleep(5)
+            exit()
 
     def line_check_and_clear(self):
         """Function to check the lines if full, clear and the move the higher blocks down"""
@@ -266,9 +268,13 @@ class Tetris2nd(Window):
         if symbol == key.UP:
             self.perform_valid_rotation(self.active_tetrimino)
         if symbol == key.LEFT:
-            schedule_interval(self.move_left, 1 / 20, self.active_tetrimino)
+            unschedule(self.move_right)
+            self.move_left(None, self.active_tetrimino)
+            schedule_interval(self.move_left, 0.1, self.active_tetrimino)
         if symbol == key.RIGHT:
-            schedule_interval(self.move_right, 1 / 20, self.active_tetrimino)
+            unschedule(self.move_left)
+            self.move_right(None, self.active_tetrimino)
+            schedule_interval(self.move_right, 0.1, self.active_tetrimino)
         if symbol == key.DOWN:
             self.fast_fall_flag = True
         if symbol == key.ESCAPE:
