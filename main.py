@@ -24,7 +24,11 @@ class Tetris2nd(Window):
     mediaplayer.queue(theme)
     mediaplayer.volume = 0.1
     mediaplayer.loop = True
-    # mediaplayer.play()
+    mediaplayer.play()
+
+    game_state_active = True
+    pause_label = Label('Pause', font_name='Comic sans MS',
+                        font_size=36, x=640, y=360, anchor_x='center', anchor_y='center', color=(255, 255, 0, 255))
 
     first_tetri = []  # Get the list of coordinates to draw the first instance of the tetrimino
 
@@ -238,8 +242,9 @@ class Tetris2nd(Window):
             self.game_over()
             self.line_check_and_clear()
             return
-        for i in tetrilist_to_move_down:
-            i[1] -= 1
+        if self.game_state_active is True:
+            for i in tetrilist_to_move_down:
+                i[1] -= 1
 
     def perform_valid_rotation(self, rotatable_tetri):
         """Checks if there is space to do a rotation and then does it"""
@@ -285,13 +290,15 @@ class Tetris2nd(Window):
         if symbol == key.LEFT:
             unschedule(self.move_right)
             self.move_left(None, self.active_tetrimino)
-            schedule_interval(self.move_left, 0.1, self.active_tetrimino)
+            schedule_interval(self.move_left, 0.15, self.active_tetrimino)
         if symbol == key.RIGHT:
             unschedule(self.move_left)
             self.move_right(None, self.active_tetrimino)
-            schedule_interval(self.move_right, 0.1, self.active_tetrimino)
+            schedule_interval(self.move_right, 0.15, self.active_tetrimino)
         if symbol == key.DOWN:
             self.fast_fall_flag = True
+        if symbol == key.SPACE:
+            self.game_state_active = not bool(self.game_state_active)
         if symbol == key.ESCAPE:
             exit()
 
@@ -311,6 +318,8 @@ class Tetris2nd(Window):
         self.grid.grid_batch.draw()
         self.tetrimino_batch.draw()
         self.frozen_batch.draw()
+        if self.game_state_active is False:
+            self.pause_label.draw()
 
     def on_resize(self, width, height):
         glViewport(0, 0, width, height)
