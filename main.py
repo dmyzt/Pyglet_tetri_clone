@@ -10,6 +10,7 @@ from pyglet.graphics import Batch
 from pyglet.shapes import BorderedRectangle
 from pyglet.clock import schedule_interval, schedule, schedule_once, unschedule
 from pyglet.gl import glClearColor, glOrtho, glViewport
+from pyglet.text import Label
 
 from grid import Grid
 from piezas import Piezas
@@ -23,7 +24,7 @@ class Tetris2nd(Window):
     mediaplayer.queue(theme)
     mediaplayer.volume = 0.1
     mediaplayer.loop = True
-    mediaplayer.play()
+    # mediaplayer.play()
 
     first_tetri = []  # Get the list of coordinates to draw the first instance of the tetrimino
 
@@ -33,7 +34,7 @@ class Tetris2nd(Window):
 
     tetrimino_batch = Batch()  # The batch that the list belongs to, to draw to the screen
     active_tetrimino = []  # The list of coordinates of the current tetrimino at play
-    tetrimino_rectangles = []   # The openGL shapes that get added to the batch to draw to the screen
+    tetrimino_rectangles = []  # The openGL shapes that get added to the batch to draw to the screen
 
     play_area = []  # Define the valid play area
 
@@ -47,20 +48,30 @@ class Tetris2nd(Window):
 
     # Keeping track of the score
     rows_cleared = 0
-    tetris_level = 0
+    tetris_level = 1
     current_score = 0
 
-    gravity = None
+    scoring_labels_batch = Batch()
+    rows_cleared_label = Label(f'Lines: \n {rows_cleared}', font_name='Arial',
+                               font_size=36, x=300, y=120, anchor_x='center', anchor_y='center',
+                               multiline=True, width=100, color=(0, 192, 0, 255),
+                               batch=scoring_labels_batch)
+    level_label = Label(f'Lvl: \n {tetris_level}', font_name='Arial',
+                        font_size=36, x=300, y=300, anchor_x='center', anchor_y='center',
+                        multiline=True, width=100, color=(192, 0, 0, 255), batch=scoring_labels_batch)
+    score_label = Label(f'Score: \n {current_score}', font_name='Arial',
+                        font_size=36, x=1000, y=300, anchor_x='center', anchor_y='center',
+                        multiline=True, width=100, color=(0, 0, 192, 255), batch=scoring_labels_batch)
 
     def __init__(self, *args, **kwargs):
         """Initializing parameters"""
         super().__init__(*args, **kwargs)
         # Screen constants
-        glClearColor(1, 1, 1, 0.0)
+        glClearColor(0.9, 0.9, 1, 0.1)
         glOrtho(0, self.width, 0, self.height, 0, 1000)
         self.set_minimum_size(1280, 720)
 
-        # importing the libraris
+        # importing the libraries
         self.piezas = Piezas(self)
         self.grid = Grid(self)
 
@@ -75,7 +86,8 @@ class Tetris2nd(Window):
 
         # A function call to constantly to the various function that animate the game
         schedule(self.convert_to_rectangles_dyn, self.active_tetrimino,
-                              self.tetrimino_rectangles, self.tetrimino_batch, self.random_number)
+                 self.tetrimino_rectangles, self.tetrimino_batch, self.random_number)
+        schedule(self.update_labels)
         self.gravity = schedule_interval(self.auto_move_down, 1 / 1, self.active_tetrimino,
                                          self.random_number)
         schedule_interval(self.fast_fall, 1 / 30, self.active_tetrimino)
@@ -100,7 +112,7 @@ class Tetris2nd(Window):
         opengl_rect_list.clear()
         for i in tetrimino_coordinates:
             rectangles = BorderedRectangle((i[0] * 30) + 490, (i[1] * 30) + 60, 30, 30, border=1,
-                                                         border_color=(1, 1, 1), batch=draw_batch)
+                                           border_color=(1, 1, 1), batch=draw_batch)
             rectangles.color = self.piezas.tetrimino_colors[color_number[0]]
             if i[1] > 19:
                 rectangles.visible = False
@@ -113,7 +125,7 @@ class Tetris2nd(Window):
             opengl_rect_list.clear()
         for i, j in zip(tetrimino_coordinates, color_number):
             rectangles = BorderedRectangle((i[0] * 30) + 490, (i[1] * 30) + 60, 30, 30, border=1,
-                                                         border_color=(1, 1, 1), batch=draw_batch)
+                                           border_color=(1, 1, 1), batch=draw_batch)
             rectangles.color = self.piezas.tetrimino_colors[j[0]]
             opengl_rect_list.append(rectangles)
 
@@ -126,14 +138,11 @@ class Tetris2nd(Window):
 
     def future_position(self, tetrilist_to_move, side='down'):
         """Checks the future position of the tetrimino and returns false if it is an invalid move"""
-        increment = -1
-        axis = 1
+        increment, axis = -1, 1
         if side == "left":
-            increment = -1
-            axis = 0
+            increment, axis = -1, 0
         elif side == "right":
-            increment = 1
-            axis = 0
+            increment, axis = 1, 0
         elif side == 'down':
             pass
         copied_list = deepcopy(tetrilist_to_move)
@@ -186,22 +195,28 @@ class Tetris2nd(Window):
                                           self.frozen_area_color, clear_blocks=True)
 
     def update_score(self, no_rows):
+        """Function the increase the score, number of lines cleared and current level"""
         self.rows_cleared += no_rows
-        self.tetris_level = (self.rows_cleared // 5) + 1
+        self.tetris_level = (self.rows_cleared // 10) + 1
         self.current_score += (no_rows * 40) * (no_rows * (self.tetris_level + 1))
         print(f"lines {self.rows_cleared}, level {self.tetris_level}, score {self.current_score}")
 
+    def update_labels(self, dt):
+        """Function to update scores on to the screen"""
+        self.rows_cleared_label.text = f'Lines: \n {self.rows_cleared}'
+        self.level_label.text = f'LvL: \n {self.tetris_level}'
+        self.score_label.text = f'Score: \n {self.current_score}'
+
     def change_gravity(self):
+        """Function to change the speed in where the pieces automatically fall"""
         if self.tetris_level <= 10:
             self.gravity = unschedule(self.auto_move_down)
             self.gravity = schedule_interval(self.auto_move_down, 1 / self.tetris_level, self.active_tetrimino,
                                              self.random_number)
-            print(f"Gravity is {self.tetris_level}")
         else:
             self.gravity = unschedule(self.auto_move_down)
             self.gravity = schedule_interval(self.auto_move_down, 1 / 11, self.active_tetrimino,
                                              self.random_number)
-            print(f"Gravity is {60 / 11}")
 
     def draw_frozen_tetrimino(self, tetrilist_to_freeze, color):
         """Freeze the tretrimino when it hits the lowest possible position of the play area"""
@@ -292,6 +307,7 @@ class Tetris2nd(Window):
     def on_draw(self):
         """Draw to the screen"""
         self.clear()
+        self.scoring_labels_batch.draw()
         self.grid.grid_batch.draw()
         self.tetrimino_batch.draw()
         self.frozen_batch.draw()
