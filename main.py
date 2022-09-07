@@ -20,13 +20,13 @@ class Tetris2nd(Window):
     """A class to recreate the classic game Tetris"""
     # Playing some music
     theme = load("Techno - Tetris (Remix) (128 kbps).mp3")
-    mediaplayer = Player()
-    mediaplayer.queue(theme)
-    mediaplayer.volume = 0.1
-    mediaplayer.loop = True
-    mediaplayer.play()
+    media_player = Player()
+    media_player.queue(theme)
+    media_player.volume = 0.1
+    media_player.loop = True
+    media_player.play()
 
-    game_state_active = True
+    game_pause = True
     pause_label = Label('Pause', font_name='Comic sans MS',
                         font_size=36, x=640, y=360, anchor_x='center', anchor_y='center', color=(255, 255, 0, 255))
 
@@ -54,6 +54,11 @@ class Tetris2nd(Window):
     rows_cleared = 0
     tetris_level = 1
     current_score = 0
+
+    game_state_active = True
+    game_over_label = Label(f"GAME OVER!!! \n LOSER!!!", "Impact",
+                            font_size=24, color=(255, 255, 255, 255), x=550, y=390, width=180, height=150, align='center',
+                            multiline=True)
 
     scoring_labels_batch = Batch()
     rows_cleared_label = Label(f'Lines: \n {rows_cleared}', font_name='Arial',
@@ -89,14 +94,13 @@ class Tetris2nd(Window):
         self.generate_tetrimino(self.first_tetri, self.active_tetrimino)
 
         # A function call to constantly to the various function that animate the game
-        schedule(self.convert_to_rectangles_dyn, self.active_tetrimino,
-                 self.tetrimino_rectangles, self.tetrimino_batch, self.random_number)
-        schedule(self.update_labels)
-        self.gravity = schedule_interval(self.auto_move_down, 1 / 1, self.active_tetrimino,
-                                         self.random_number)
-        schedule_interval(self.fast_fall, 1 / 30, self.active_tetrimino)
-        schedule_once(self.move_left, 1, self.active_tetrimino)
-        schedule_once(self.move_right, 1, self.active_tetrimino)
+        if self.game_state_active is True:
+            schedule(self.convert_to_rectangles_dyn, self.active_tetrimino,
+                     self.tetrimino_rectangles, self.tetrimino_batch, self.random_number)
+            schedule(self.update_labels)
+            self.gravity = schedule_interval(self.auto_move_down, 1 / 1, self.active_tetrimino,
+                                             self.random_number)
+            schedule_interval(self.fast_fall, 1 / 30, self.active_tetrimino)
 
     def create_new_tetri(self, tetri_piece_coordinates):
         """Randomly selects a tetri piece and gives its coordinates"""
@@ -155,12 +159,14 @@ class Tetris2nd(Window):
             if i not in self.play_area or i in self.frozen_area:
                 return False
 
-    def game_over(self):
-        """Function to check if the blocks can no longer move and end the game"""
-        if self.active_tetrimino[0][1] >= 20 and self.future_position(self.active_tetrimino) is False:
-            print("Game Over!!!")
-            sleep(5)
-            exit()
+    def restart_game(self):
+        self.frozen_area.clear()
+        self.frozen_area_color.clear()
+        self.tetrimino_frozen_rect.clear()
+        self.rows_cleared = 0
+        self.tetris_level = 1
+        self.current_score = 0
+        self.game_state_active = True
 
     def line_check_and_clear(self):
         """Function to check the lines if full, clear and the move the higher blocks down"""
@@ -202,7 +208,7 @@ class Tetris2nd(Window):
         """Function the increase the score, number of lines cleared and current level"""
         self.rows_cleared += no_rows
         self.tetris_level = (self.rows_cleared // 10) + 1
-        self.current_score += (no_rows * 40) * (no_rows * (self.tetris_level + 1))
+        self.current_score += (no_rows * 40) * (no_rows * self.tetris_level)
         print(f"lines {self.rows_cleared}, level {self.tetris_level}, score {self.current_score}")
 
     def update_labels(self, dt):
@@ -237,12 +243,15 @@ class Tetris2nd(Window):
 
     def auto_move_down(self, dt, tetrilist_to_move_down, color):
         """main gameplay mechanic, auto drops the tetrimino 'gravity' basically."""
+        if self.active_tetrimino[0][1] >= 20 and self.future_position(self.active_tetrimino) is False:
+            print("Game Over!!!")
+            self.game_state_active = False
+            return
         if self.future_position(tetrilist_to_move_down) is False:
             self.draw_frozen_tetrimino(tetrilist_to_move_down, color)
-            self.game_over()
             self.line_check_and_clear()
             return
-        if self.game_state_active is True:
+        if self.game_pause is False:
             for i in tetrilist_to_move_down:
                 i[1] -= 1
 
@@ -253,7 +262,8 @@ class Tetris2nd(Window):
         for i in x:
             if i not in self.play_area or i in self.frozen_area:
                 return
-        self.piezas.tetri_rotation(rotatable_tetri, self.random_number)
+        if self.game_pause is False:
+            self.piezas.tetri_rotation(rotatable_tetri, self.random_number)
 
     def move_left(self, dt, tetrilist_to_move_left):
         """The function to move the tetrimino to the left."""
@@ -261,8 +271,9 @@ class Tetris2nd(Window):
             return
         else:
             pass
-        for i in tetrilist_to_move_left:
-            i[0] -= 1
+        if self.game_pause is False:
+            for i in tetrilist_to_move_left:
+                i[0] -= 1
 
     def move_right(self, dt, tetrilist_to_move_right):
         """The function to move the tetrimino to the right"""
@@ -270,8 +281,9 @@ class Tetris2nd(Window):
             return
         else:
             pass
-        for i in tetrilist_to_move_right:
-            i[0] += 1
+        if self.game_pause is False:
+            for i in tetrilist_to_move_right:
+                i[0] += 1
 
     def fast_fall(self, dt, tetrilist_to_move_down):
         """The function to make the tetrimino drop faster"""
@@ -279,7 +291,7 @@ class Tetris2nd(Window):
             return
         else:
             pass
-        if self.fast_fall_flag is True:
+        if self.fast_fall_flag is True and self.game_pause is False:
             for i in tetrilist_to_move_down:
                 i[1] -= 1
 
@@ -298,7 +310,10 @@ class Tetris2nd(Window):
         if symbol == key.DOWN:
             self.fast_fall_flag = True
         if symbol == key.SPACE:
-            self.game_state_active = not bool(self.game_state_active)
+            self.game_pause = not bool(self.game_pause)
+        if symbol == key.ENTER:
+            if self.game_state_active is False:
+                self.restart_game()
         if symbol == key.ESCAPE:
             exit()
 
@@ -318,8 +333,10 @@ class Tetris2nd(Window):
         self.grid.grid_batch.draw()
         self.tetrimino_batch.draw()
         self.frozen_batch.draw()
-        if self.game_state_active is False:
+        if self.game_pause is True:
             self.pause_label.draw()
+        if self.game_state_active is False:
+            self.game_over_label.draw()
 
     def on_resize(self, width, height):
         glViewport(0, 0, width, height)
