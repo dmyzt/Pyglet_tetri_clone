@@ -4,7 +4,6 @@ from copy import deepcopy
 class Piezas:
     def __init__(self, game):
         # Define the constants like the block size and the tetriminos coordinates and grid
-        self.BLOCK_SIZE = game.BLOCK_SIZE
         self.O = [[0, 0], [-1, 1], [-1, 0], [0, 1]]
         self.I = [[0, 0], [-2, 0], [-1, 0], [1, 0]]
         self.T = [[0, 0], [-1, 0], [0, 1], [1, 0]]
@@ -25,7 +24,5 @@ class Piezas:
         for i in tetrimino_to_rotate:
             i[0] -= x[0]
             i[1] -= x[1]
-            y = - i[1]
-            z = i[0]
-            i[0] = y + x[0]
-            i[1] = z + x[1]
+            y, z = - i[1], i[0]
+            i[0], i[1] = (y + x[0]), (z + x[1])

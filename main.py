@@ -1,81 +1,86 @@
 from random import choice
 from copy import deepcopy
-from time import sleep
-import pyglet
+
+import pyglet.clock
+from pyglet.app import run
+from pyglet.window import Window, key
+from pyglet.media import Player, load
+from pyglet.graphics import Batch
+from pyglet.shapes import BorderedRectangle
+from pyglet.clock import schedule_interval, schedule, schedule_once, unschedule
+from pyglet.gl import glClearColor, glOrtho, glViewport
+
 from sys import exit
 from grid import Grid
 from piezas import Piezas
 
 
-class Tetris2nd(pyglet.window.Window):
+class Tetris2nd(Window):
     """A class to recreate the classic game Tetris"""
+    # Playing some music
+    theme = load("Techno - Tetris (Remix) (128 kbps).mp3")
+    mediaplayer = Player()
+    mediaplayer.queue(theme)
+    mediaplayer.volume = 0.05
+    mediaplayer.loop = True
+    mediaplayer.play()
+
+    first_tetri = []  # Get the list of coordinates to draw the first instance of the tetrimino
+
+    # Get a random number to draw the first tetrimino
+    seven_bag = [0, 1, 2, 3, 4, 5, 6]
+    random_number = [0]
+
+    tetrimino_batch = Batch()  # The batch that the list belongs to, to draw to the screen
+    active_tetrimino = []  # The list of coordinates of the current tetrimino at play
+    tetrimino_rectangles = []   # The openGL shapes that get added to the batch to draw to the screen
+
+    play_area = []  # Define the valid play area
+
+    # Store info about frozen tetriminos
+    frozen_batch = Batch()
+    frozen_area = []
+    frozen_area_color = []
+    tetrimino_frozen_rect = []
+
+    fast_fall_flag = False  # A flag to drop the pieces faster
+
+    # Keeping track of the score
+    rows_cleared = 0
+    tetris_level = 0
+    current_score = 0
+
+    gravity = None
 
     def __init__(self, *args, **kwargs):
         """Initializing parameters"""
         super().__init__(*args, **kwargs)
         # Screen constants
-        pyglet.gl.glClearColor(1, 1, 1, 0.0)
-        pyglet.gl.glOrtho(0, self.width, 0, self.height, 0, 1000)
+        glClearColor(1, 1, 1, 0.0)
+        glOrtho(0, self.width, 0, self.height, 0, 1000)
         self.set_minimum_size(1280, 720)
 
-        # Playing some music
-        self.theme = pyglet.media.load("Original Tetris theme (Tetris Soundtrack) (128 kbps).mp3")
-        self.mediaplayer = pyglet.media.Player()
-        self.mediaplayer.queue(self.theme)
-        self.mediaplayer.volume = 0.3
-        self.mediaplayer.loop = True
-        self.mediaplayer.play()
-
-        # Define the constants like the block size and the tetriminos coordinates and grid
-        self.BLOCK_SIZE = self.height // 24
+        # importing the libraris
         self.piezas = Piezas(self)
         self.grid = Grid(self)
 
-        # Animating some walking mega man
-        # self.ani = pyglet.resource.animation('megaman-running-gif-1.gif')
-        # self.ani_sprite = pyglet.sprite.Sprite(img=self.ani, x=(2 * self.BLOCK_SIZE),
-                                               # y=(2 * self.BLOCK_SIZE))
-
-        # Define the valid play area
-        self.play_area = deepcopy(self.grid.initial_play_area)
-
-        # Get the list of coordinates to draw the first instance of the tetrimino
-        self.first_tetri = []
-        # Get a random number to draw the first tetrimino
-        self.seven_bag = [0, 1, 2, 3, 4, 5, 6]
-        self.random_number = [0]
-        # The batch that the list belongs to, to draw to the screen
-        self.tetrimino_batch = pyglet.graphics.Batch()
-        # The list of coordinates of the current tetrimino at play
-        self.active_tetrimino = []
-        # The openGL shapes that get added to the batch to draw to the screen
-        self.tetrimino_rectangles = []
+        # Fill the valid play area
+        for i in range(0, 10, 1):
+            for j in range(0, 25, 1):
+                self.play_area.append([i, j])
 
         # Function call to generate first tetrimino
         self.create_new_tetri(self.first_tetri)
         self.generate_tetrimino(self.first_tetri, self.active_tetrimino)
 
-        # Store info about frozen tetriminos
-        self.frozen_batch = pyglet.graphics.Batch()
-        self.frozen_area = []
-        self.frozen_area_color = []
-        self.tetrimino_frozen_rect = []
-
-        self.indice = None
-
-        # A flag that activates to move your tetris
-        self.fast_fall_flag = False
-        self.move_left_flag = False
-        self.move_right_flag = False
-
         # A function call to constantly to the various function that animate the game
-        pyglet.clock.schedule_interval(self.convert_to_rectangles_dyn, 1 / 60.0, self.active_tetrimino,
-                                       self.tetrimino_rectangles, self.tetrimino_batch,
-                                       self.random_number)
-        pyglet.clock.schedule_interval(self.auto_move_down, 1 / 1.0, self.active_tetrimino, self.random_number)
-        pyglet.clock.schedule_interval(self.fast_fall, 1 / 30.0, self.active_tetrimino)
-        pyglet.clock.schedule_interval(self.move_left, 1 / 15.0, self.active_tetrimino)
-        pyglet.clock.schedule_interval(self.move_right, 1 / 15.0, self.active_tetrimino)
+        schedule(self.convert_to_rectangles_dyn, self.active_tetrimino,
+                              self.tetrimino_rectangles, self.tetrimino_batch, self.random_number)
+        self.gravity = schedule_interval(self.auto_move_down, 1 / 1, self.active_tetrimino,
+                                         self.random_number)
+        schedule_interval(self.fast_fall, 1 / 30, self.active_tetrimino)
+        schedule_once(self.move_left, 1, self.active_tetrimino)
+        schedule_once(self.move_right, 1, self.active_tetrimino)
 
     def create_new_tetri(self, tetri_piece_coordinates):
         """Randomly selects a tetri piece and gives its coordinates"""
@@ -94,9 +99,11 @@ class Tetris2nd(pyglet.window.Window):
         """Turns the tetrimino coordinates into openGL rectangles of the pieces that moce"""
         opengl_rect_list.clear()
         for i in tetrimino_coordinates:
-            rectangles = pyglet.shapes.BorderedRectangle((i[0] * 30) + 490, (i[1] * 30) + 60, 30, 30, border=1,
+            rectangles = BorderedRectangle((i[0] * 30) + 490, (i[1] * 30) + 60, 30, 30, border=1,
                                                          border_color=(1, 1, 1), batch=draw_batch)
             rectangles.color = self.piezas.tetrimino_colors[color_number[0]]
+            if i[1] > 19:
+                rectangles.visible = False
             opengl_rect_list.append(rectangles)
 
     def convert_to_rectangles_frozen(self, tetrimino_coordinates, opengl_rect_list,
@@ -105,7 +112,7 @@ class Tetris2nd(pyglet.window.Window):
         if clear_blocks is True:
             opengl_rect_list.clear()
         for i, j in zip(tetrimino_coordinates, color_number):
-            rectangles = pyglet.shapes.BorderedRectangle((i[0] * 30) + 490, (i[1] * 30) + 60, 30, 30, border=1,
+            rectangles = BorderedRectangle((i[0] * 30) + 490, (i[1] * 30) + 60, 30, 30, border=1,
                                                          border_color=(1, 1, 1), batch=draw_batch)
             rectangles.color = self.piezas.tetrimino_colors[j[0]]
             opengl_rect_list.append(rectangles)
@@ -137,8 +144,7 @@ class Tetris2nd(pyglet.window.Window):
 
     def game_over(self):
         """Function to check if the blocks can no longer move and end the game"""
-        # stukc here
-        if self.active_tetrimino[0][1] == 20 and self.future_position(self.active_tetrimino) is False:
+        if self.active_tetrimino[0][1] >= 20 and self.future_position(self.active_tetrimino) is False:
             print("This is truly game over")
 
     def line_check_and_clear(self):
@@ -154,18 +160,8 @@ class Tetris2nd(pyglet.window.Window):
             no_full_rows = self._line_clear(filled_row, lista_yaxis, no_full_rows)
         self._move_lines_down(lista_yaxis, no_full_rows)
 
-    def _move_lines_down(self, lista_yaxis, no_full_rows):
-        """Function to moves the higher pieces down after a line has been cleared"""
-        if no_full_rows > 0:
-            min_yaxis = min(lista_yaxis)
-            for z in self.frozen_area:
-                if z[1] > min_yaxis:
-                    z[1] -= no_full_rows
-        self.convert_to_rectangles_frozen(self.frozen_area, self.tetrimino_frozen_rect, self.frozen_batch,
-                                          self.frozen_area_color, clear_blocks=True)
-
     def _line_clear(self, filled_row, lista_yaxis, no_full_rows):
-        """Function to clear a line that has beed filled"""
+        """Function to clear a line that has been filled"""
         if len(filled_row) > 9:
             no_full_rows += 1
             lista_yaxis.append(filled_row[0][1])
@@ -174,6 +170,36 @@ class Tetris2nd(pyglet.window.Window):
                 self.frozen_area.pop(indice)
                 self.frozen_area_color.pop(indice)
         return no_full_rows
+
+    def _move_lines_down(self, lista_yaxis, no_full_rows):
+        """Function to move the higher pieces down after a line has been cleared"""
+        self.update_score(no_full_rows)
+        self.change_gravity()
+        if no_full_rows > 0:
+            min_yaxis = min(lista_yaxis)
+            for z in self.frozen_area:
+                if z[1] > min_yaxis:
+                    z[1] -= no_full_rows
+        self.convert_to_rectangles_frozen(self.frozen_area, self.tetrimino_frozen_rect, self.frozen_batch,
+                                          self.frozen_area_color, clear_blocks=True)
+
+    def update_score(self, no_rows):
+        self.rows_cleared += no_rows
+        self.tetris_level = (self.rows_cleared // 5) + 1
+        self.current_score += (no_rows * 40) * (no_rows * (self.tetris_level + 1))
+        print(f"lines {self.rows_cleared}, level {self.tetris_level}, score {self.current_score}")
+
+    def change_gravity(self):
+        if self.tetris_level <= 10:
+            self.gravity = unschedule(self.auto_move_down)
+            self.gravity = schedule_interval(self.auto_move_down, 1 / self.tetris_level, self.active_tetrimino,
+                                             self.random_number)
+            print(f"Gravity is {self.tetris_level}")
+        else:
+            self.gravity = unschedule(self.auto_move_down)
+            self.gravity = schedule_interval(self.auto_move_down, 1 / 11, self.active_tetrimino,
+                                             self.random_number)
+            print(f"Gravity is {60 / 11}")
 
     def draw_frozen_tetrimino(self, tetrilist_to_freeze, color):
         """Freeze the tretrimino when it hits the lowest possible position of the play area"""
@@ -188,14 +214,14 @@ class Tetris2nd(pyglet.window.Window):
         self.create_new_tetri(self.first_tetri)
         self.generate_tetrimino(self.first_tetri, self.active_tetrimino)
 
-    def auto_move_down(self, dt, tetrilist_to_movedown, color):
+    def auto_move_down(self, dt, tetrilist_to_move_down, color):
         """main gameplay mechanic, auto drops the tetrimino 'gravity' basically."""
-        if self.future_position(tetrilist_to_movedown) is False:
-            self.draw_frozen_tetrimino(tetrilist_to_movedown, color)
+        if self.future_position(tetrilist_to_move_down) is False:
+            self.draw_frozen_tetrimino(tetrilist_to_move_down, color)
             self.game_over()
             self.line_check_and_clear()
             return
-        for i in tetrilist_to_movedown:
+        for i in tetrilist_to_move_down:
             i[1] -= 1
 
     def perform_valid_rotation(self, rotatable_tetri):
@@ -207,70 +233,67 @@ class Tetris2nd(pyglet.window.Window):
                 return
         self.piezas.tetri_rotation(rotatable_tetri, self.random_number)
 
-    def move_left(self, dt, tetrilist_to_moveleft):
+    def move_left(self, dt, tetrilist_to_move_left):
         """The function to move the tetrimino to the left."""
-        if self.future_position(tetrilist_to_moveleft, "left") is False:
+        if self.future_position(tetrilist_to_move_left, "left") is False:
             return
         else:
             pass
-        if self.move_left_flag is True:
-            for i in tetrilist_to_moveleft:
-                i[0] -= 1
+        for i in tetrilist_to_move_left:
+            i[0] -= 1
 
-    def move_right(self, dt, tetrilist_to_moveright):
+    def move_right(self, dt, tetrilist_to_move_right):
         """The function to move the tetrimino to the right"""
-        if self.future_position(tetrilist_to_moveright, "right") is False:
+        if self.future_position(tetrilist_to_move_right, "right") is False:
             return
         else:
             pass
-        if self.move_right_flag is True:
-            for i in tetrilist_to_moveright:
-                i[0] += 1
+        for i in tetrilist_to_move_right:
+            i[0] += 1
 
-    def fast_fall(self, dt, tetrilist_to_movedown):
+    def fast_fall(self, dt, tetrilist_to_move_down):
         """The function to make the tetrimino drop faster"""
-        if self.future_position(tetrilist_to_movedown) is False:
+        if self.future_position(tetrilist_to_move_down) is False:
             return
         else:
             pass
         if self.fast_fall_flag is True:
-            for i in tetrilist_to_movedown:
+            for i in tetrilist_to_move_down:
                 i[1] -= 1
 
     def on_key_press(self, symbol, modifiers):
         """Determine the functions on key press"""
-        if symbol == pyglet.window.key.UP:
+        if symbol == key.UP:
             self.perform_valid_rotation(self.active_tetrimino)
-        if symbol == pyglet.window.key.LEFT:
-            self.move_left_flag = True
-        if symbol == pyglet.window.key.RIGHT:
-            self.move_right_flag = True
-        if symbol == pyglet.window.key.DOWN:
+        if symbol == key.LEFT:
+            schedule_interval(self.move_left, 1 / 20, self.active_tetrimino)
+        if symbol == key.RIGHT:
+            schedule_interval(self.move_right, 1 / 20, self.active_tetrimino)
+        if symbol == key.DOWN:
             self.fast_fall_flag = True
-        if symbol == pyglet.window.key.ESCAPE:
+        if symbol == key.ESCAPE:
             exit()
 
     def on_key_release(self, symbol, modifiers):
         """Determine the function of key releases"""
-        if symbol == pyglet.window.key.LEFT:
-            self.move_left_flag = False
-        if symbol == pyglet.window.key.RIGHT:
-            self.move_right_flag = False
-        if symbol == pyglet.window.key.DOWN:
+        if symbol == key.LEFT:
+            unschedule(self.move_left)
+        if symbol == key.RIGHT:
+            unschedule(self.move_right)
+        if symbol == key.DOWN:
             self.fast_fall_flag = False
 
     def on_draw(self):
         """Draw to the screen"""
         self.clear()
-        # self.ani_sprite.draw()
         self.grid.grid_batch.draw()
         self.tetrimino_batch.draw()
         self.frozen_batch.draw()
 
     def on_resize(self, width, height):
-        pyglet.gl.glViewport(0, 0, width, height)
+        glViewport(0, 0, width, height)
 
 
 if __name__ == "__main__":
     t_game = Tetris2nd(1280, 720, caption="Tetris!!!", vsync=True, resizable=True)
-    pyglet.app.run()
+    run()

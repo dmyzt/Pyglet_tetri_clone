@@ -7,10 +7,6 @@ class Grid:
         self.initial_grid = self.generate_rectangle(loc_batch=self.grid_batch)
         self.grid_list = []
         self.generate_grid()
-        self.initial_play_area = []
-        for i in range(0, 10, 1):
-            for j in range(0, 25, 1):
-                self.initial_play_area.append([i, j])
 
     def generate_grid(self):
         for x in range(0, 11 * 30, 30):
