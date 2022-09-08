@@ -1,6 +1,5 @@
 from random import choice
 from copy import deepcopy
-from time import sleep
 from sys import exit
 
 from pyglet.app import run
@@ -8,7 +7,7 @@ from pyglet.window import Window, key
 from pyglet.media import Player, load
 from pyglet.graphics import Batch
 from pyglet.shapes import BorderedRectangle
-from pyglet.clock import schedule_interval, schedule, schedule_once, unschedule
+from pyglet.clock import schedule_interval, schedule, unschedule
 from pyglet.gl import glClearColor, glOrtho, glViewport
 from pyglet.text import Label
 
@@ -57,8 +56,8 @@ class Tetris2nd(Window):
 
     game_state_active = True
     game_over_label = Label(f"GAME OVER!!! \n LOSER!!!", "Impact",
-                            font_size=24, color=(255, 255, 255, 255), x=550, y=390, width=180, height=150, align='center',
-                            multiline=True)
+                            font_size=24, color=(255, 255, 255, 255), x=550, y=390, width=180, height=150,
+                            align='center', multiline=True)
 
     scoring_labels_batch = Batch()
     rows_cleared_label = Label(f'Lines: \n {rows_cleared}', font_name='Arial',
@@ -160,6 +159,7 @@ class Tetris2nd(Window):
                 return False
 
     def restart_game(self):
+        """Clears the board, the scores and starts again"""
         self.frozen_area.clear()
         self.frozen_area_color.clear()
         self.tetrimino_frozen_rect.clear()
