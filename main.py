@@ -209,7 +209,6 @@ class Tetris2nd(Window):
         self.rows_cleared += no_rows
         self.tetris_level = (self.rows_cleared // 10) + 1
         self.current_score += (no_rows * 40) * (no_rows * self.tetris_level)
-        print(f"lines {self.rows_cleared}, level {self.tetris_level}, score {self.current_score}")
 
     def update_labels(self, dt):
         """Function to update scores on to the screen"""
@@ -244,7 +243,6 @@ class Tetris2nd(Window):
     def auto_move_down(self, dt, tetrilist_to_move_down, color):
         """main gameplay mechanic, auto drops the tetrimino 'gravity' basically."""
         if self.active_tetrimino[0][1] >= 20 and self.future_position(self.active_tetrimino) is False:
-            print("Game Over!!!")
             self.game_state_active = False
             return
         if self.future_position(tetrilist_to_move_down) is False:
